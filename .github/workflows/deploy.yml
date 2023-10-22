@@ -12,6 +12,10 @@ on:
         - create
         - delete
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   terraform-modules:
     runs-on: ubuntu-latest
@@ -70,8 +74,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: "arn:aws:iam::151403969336:role/oidc-github-actions"
+          role-session-name: "oidc-github-actions"
           aws-region: ${{ vars.AWS_DEFAULT_REGION }}
 
       - name: Terraform Init components
