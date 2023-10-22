@@ -39,12 +39,15 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 ############################################################### INIT TASK
 COMAMND="helm delete $RELEASE_NAME --namespace $NAMESPACE 2>&1"
+COMMAND_RETURNED=`eval ${COMAMND}`
+SUB="Error"
+NOT_FOUND="not found"
 
-FILE="$HELM_STATE_DIR/release-$RELEASE_NAME-namespace-$NAMESPACE.txt"
-
-if [ -f "$FILE" ]; then
-  COMMAND_RETURNED=`eval ${COMAMND}`
-  rm -r "$FILE"
+if [[ "$COMMAND_RETURNED" != *"$NOT_FOUND"* ]]; then
+  if [[ "$COMMAND_RETURNED" == *"$SUB"* ]]; then
+    echo $COMMAND_RETURNED
+    exit 0
+  fi
 fi
 
 echo "Release $RELEASE_NAME on Namespace $NAMESPACE deleted!"

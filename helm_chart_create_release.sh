@@ -68,18 +68,16 @@ then
   COMAMND=$(echo $COMAMND | sed "s/$WHITE_SPACE/ /g")
 fi
 
-FILE="$HELM_STATE_DIR/release-$RELEASE_NAME-namespace-$NAMESPACE.txt"
 COMMAND_RETURNED=`eval ${COMAMND}`
 SUB="Error"
 REUSE="re-use"
 
-if [ ! -f "$FILE" ] && [[ "$COMMAND_RETURNED" != *"$REUSE"* ]]; then
+if [[ "$COMMAND_RETURNED" != *"$REUSE"* ]]; then
   if [[ "$COMMAND_RETURNED" == *"$SUB"* ]]; then
     echo $COMMAND_RETURNED
     exit 0
   else
     echo "Release $RELEASE_NAME on Namespace $NAMESPACE created!"
-    echo $COMMAND_RETURNED > "$HELM_STATE_DIR/release-$RELEASE_NAME-namespace-$NAMESPACE.txt"
   fi
 else
   echo "Release already exists!"
