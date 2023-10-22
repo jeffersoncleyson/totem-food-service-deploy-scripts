@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TERRAFORM_COMPONENTS_DIR: "./totem-food-service-tf-module-components"
+      TERRAFORM_INTEGRATION_DIR: "./totem-food-service-tf-module-integration-api-gateway-and-eks"
       HELM_CHART_DIR: "./totem-food-service-helm-chart"
       WHITE_SPACE: "@"
     steps:
@@ -88,11 +89,13 @@ jobs:
           terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} init -reconfigure
 
       - name: Install Lambda Authorizer Dependencies
+        continue-on-error: false
         if: ${{ github.event.inputs.applicationState == 'create' }}
         run: |
           npm install --prefix ./totem-food-service-tf-module-authorizer/lambda
       
       - name: Install Lambda Login Dependencies
+        continue-on-error: false
         if: ${{ github.event.inputs.applicationState == 'create' }}
         run: |
           npm install --prefix ./totem-food-service-tf-module-login/lambda
@@ -108,14 +111,9 @@ jobs:
         continue-on-error: false
         run: terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} apply -auto-approve
 
-      - name: Terraform Destroy components
-        id: destroy
-        if: ${{ github.event.inputs.applicationState == 'delete' }}
-        continue-on-error: false
-        run: terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} destroy -auto-approve
-
 
       - name: Getting terraform componentes values
+        continue-on-error: false
         if: ${{ github.event.inputs.applicationState == 'create' }}
         run: |
           CLIENT_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_client_name)
@@ -134,18 +132,20 @@ jobs:
           echo "API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK" >> $GITHUB_ENV
 
       - name: Getting AWS Cognito Client Secret
+        continue-on-error: false
         if: ${{ github.event.inputs.applicationState == 'create' }}
         run: |
           CLIENT_SECRET=$(. ./cognito_get_client_secret.sh --user-pool-id $USER_POOL_ID --client-name $CLIENT_NAME --client-id $CLIENT_ID)
           echo "CLIENT_SECRET=$CLIENT_SECRET" >> $GITHUB_ENV
 
       - name: Configuring EKS Context
-        if: ${{ github.event.inputs.applicationState == 'create' }}
+        continue-on-error: false
         run: |
           CLUSTER_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cluster_eks_name)
           . ./add_eks.sh --cluster-name $CLUSTER_NAME --region ${{ vars.AWS_DEFAULT_REGION }} 
 
       - name: Configuring EKS Namespace
+        continue-on-error: false
         if: ${{ github.event.inputs.applicationState == 'create' }}
         run: |
           . ./add_namespace.sh --namespace ${{vars.NAMESPACE}}
@@ -163,6 +163,7 @@ jobs:
 
       - name: Releasing Helm Charts
         if: ${{ github.event.inputs.applicationState == 'create' }}
+        continue-on-error: false
         uses: WyriHaximus/github-action-helm3@v3
         with:
           exec: |
@@ -178,3 +179,77 @@ jobs:
             TOTEM_FOOD_CHART=totem-food-chart
             VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }},secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id=${{ secrets.STORE_TOKEN_ID }}
             . ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace ${{vars.NAMESPACE}} --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
+
+      - name: Getting Kubernetes Load Balancer value
+        continue-on-error: false
+        run: |
+          SVC_PRIVATE_LB="totem-totem-food-service-lb-private"
+          DNS_NAME=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB --namespace ${{vars.NAMESPACE}})
+          LB_ARN=$(. ./load_balancer_get_attributes.sh --region ${{ vars.AWS_DEFAULT_REGION }} --dns-name $DNS_NAME)
+          LISTENER_ARN=$(. ./describe_load_balancer_lister.sh --region ${{ vars.AWS_DEFAULT_REGION }} --load-balancer-arn $LB_ARN)
+          echo "LISTENER_ARN=$LISTENER_ARN" >> $GITHUB_ENV
+
+      - name: Getting Integration values
+        continue-on-error: false
+        run: |
+          CLUSTER_EKS_VPC_LINK=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cluster_eks_vpc_link)
+          echo "CLUSTER_EKS_VPC_LINK=$CLUSTER_EKS_VPC_LINK" >> $GITHUB_ENV
+
+          CLUSTER_EKS_PRIVATE_SUBNET_ONE=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cluster_eks_private_subnet_one)
+          echo "CLUSTER_EKS_PRIVATE_SUBNET_ONE=$CLUSTER_EKS_PRIVATE_SUBNET_ONE" >> $GITHUB_ENV
+
+          CLUSTER_EKS_PRIVATE_SUBNET_TWO=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cluster_eks_private_subnet_two)
+          echo "CLUSTER_EKS_PRIVATE_SUBNET_TWO=$CLUSTER_EKS_PRIVATE_SUBNET_TWO" >> $GITHUB_ENV
+          
+          API_GATEWAY_RESTRICT_API_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key aws_apigatewayv2_api_restrict_api_id)
+          echo "API_GATEWAY_RESTRICT_API_ID=$API_GATEWAY_RESTRICT_API_ID" >> $GITHUB_ENV
+          
+          API_GATEWAY_AUTORIZER_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key aws_apigatewayv2_authorizer_authorizer_id)
+          echo "API_GATEWAY_AUTORIZER_ID=$API_GATEWAY_AUTORIZER_ID" >> $GITHUB_ENV
+
+          API_GATEWAY_VPC_LINK_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key aws_apigatewayv2_vpc_link_eks_id)
+          echo "API_GATEWAY_VPC_LINK_ID=$API_GATEWAY_VPC_LINK_ID" >> $GITHUB_ENV
+
+      - name: Terraform Init integration
+        id: init_integration
+        continue-on-error: false
+        run: |
+          cat << EOF > ${{ env.TERRAFORM_INTEGRATION_DIR }}/terraform.tfvars.json
+          {
+            "application_name": "${{ vars.APP_NAME }}", 
+            "environment": "${{ vars.ENVIRONMENT }}", 
+            "owner_team": "${{ vars.OWNER_TEAM }}",
+            "region": "${{ vars.AWS_DEFAULT_REGION }}",
+            "vpc_security_group_eks_ids": ["${{ env.CLUSTER_EKS_VPC_LINK }}"], 
+            "eks_private_subnet_ids": ["${{ env.CLUSTER_EKS_PRIVATE_SUBNET_ONE }}", "${{ env.CLUSTER_EKS_PRIVATE_SUBNET_TWO }}"], 
+            "eks_private_load_balancer_arn": "${{ env.LISTENER_ARN }}",
+            "aws_apigatewayv2_api_restrict_api_id": "${{ env.API_GATEWAY_RESTRICT_API_ID }}",
+            "aws_apigatewayv2_authorizer_authorizer_id": "${{ env.API_GATEWAY_AUTORIZER_ID }}",
+            "aws_apigatewayv2_vpc_link_eks_id": "${{ env.API_GATEWAY_VPC_LINK_ID }}"
+          }
+          EOF
+          terraform -chdir=${{ env.TERRAFORM_INTEGRATION_DIR }} init -reconfigure
+
+      - name: Terraform Plan integration
+        id: plan_integration
+        continue-on-error: false
+        run: terraform -chdir=${{ env.TERRAFORM_INTEGRATION_DIR }} plan
+
+      - name: Terraform Apply integration
+        id: apply_integration
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        continue-on-error: false
+        run: terraform -chdir=${{ env.TERRAFORM_INTEGRATION_DIR }} apply -auto-approve
+
+      - name: Terraform Destroy
+        id: destroy
+        if: ${{ github.event.inputs.applicationState == 'delete' }}
+        continue-on-error: false
+        run: |
+          . ./helm_chart_delete_release.sh --release totem --namespace ${{vars.NAMESPACE}}
+          . ./helm_chart_delete_release.sh --release payment --namespace ${{vars.NAMESPACE}}
+          . ./helm_chart_delete_release.sh --release mailhog --namespace ${{vars.NAMESPACE}}
+          . ./helm_chart_delete_release.sh --release mongo --namespace ${{vars.NAMESPACE}}
+          terraform -chdir=$TERRAFORM_INTEGRATION_DIR destroy -auto-approve
+          terraform -chdir=$TERRAFORM_COMPONENTS_DIR destroy -auto-approve
+
