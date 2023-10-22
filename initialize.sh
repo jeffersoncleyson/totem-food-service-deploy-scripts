@@ -8,6 +8,12 @@ ENVIRONMENT="sandbox"
 OWNER_TEAM="team-totem-food-service"
 REGION=us-east-1
 NAMESPACE=totem-apps
+MERCADO_PAGO_PAYMENT_GATEWAY=https://api.mercadopago.com
+STORE_ID=POSTOTEM001
+STORE_USER_ID=1481636739
+WHITE_SPACE=@
+STORE_TOKEN_ID="\"Bearer${WHITE_SPACE}TEST-TOKEN\""
+
 
 ### AWS Profile if you are using SSO
 ### In case of AWS credials comment this variable
@@ -54,6 +60,8 @@ echo -e "\n########### GETTING VARIABLES FROM TERRAFORM #####################\n"
 CLIENT_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_client_name)
 CLIENT_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_client_id)
 USER_POOL_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_user_pool_id)
+API_GATEWAY_STAGE_URL=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key api_gateway_url)
+API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK=$API_GATEWAY_STAGE_URL/v1/totem/payment/callback
 
 echo -e "\n########### GETTING CLIENT SECRET #####################\n"
 CLIENT_SECRET=$(. ./cognito_get_client_secret.sh --profile $PROFILE --user-pool-id $USER_POOL_ID --client-name $CLIENT_NAME --client-id $CLIENT_ID)
@@ -84,8 +92,8 @@ PAYMENT_GATEWAY_CHART=payment-gateway-chart
 . ./helm_chart_create_release.sh --release payment --dir $HELM_CHART_DIR/$PAYMENT_GATEWAY_CHART --namespace $NAMESPACE
 
 TOTEM_FOOD_CHART=totem-food-chart
-VALUES_TO_SET="image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET"
-. ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace $NAMESPACE --values-to-set $VALUES_TO_SET
+VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,secrets.payment.gateway.store_id=$STORE_ID,secrets.payment.gateway.store_user_id=$STORE_USER_ID,secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
+. ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace $NAMESPACE --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
 
 echo -e "\n########### RESTARTING DEPLOYMENT #####################\n"
 ./restart_deployment.sh -dn coredns -n kube-system

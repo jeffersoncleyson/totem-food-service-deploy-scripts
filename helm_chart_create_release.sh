@@ -28,6 +28,11 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
+    -ws|--white-space)
+      WHITE_SPACE="$2"
+      shift # past argument
+      shift # past value
+      ;;
     -h|--help)
       echo -e "Options:\n \tRelease Name: -r or --release \n \tHelm Dir: -d or --dir \n \tNamespace: -n or --namespace \n \tValues to set: -vts or --values-to-set\n"
       exit 1
@@ -49,11 +54,18 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 ############################################################### INIT TASK
 
+
 if [ -z "$VALUES_TO_SET" ]
 then
   COMAMND="helm install $RELEASE_NAME $HELM_DIR --namespace $NAMESPACE 2>&1"
 else
   COMAMND="helm install $RELEASE_NAME $HELM_DIR --namespace $NAMESPACE --set $VALUES_TO_SET 2>&1"
+  
+fi
+
+if [ ! -z "$WHITE_SPACE" ]
+then
+  COMAMND=$(echo $COMAMND | sed "s/$WHITE_SPACE/ /g")
 fi
 
 FILE="$HELM_STATE_DIR/release-$RELEASE_NAME-namespace-$NAMESPACE.txt"
