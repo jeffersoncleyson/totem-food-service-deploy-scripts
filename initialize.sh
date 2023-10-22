@@ -31,8 +31,8 @@ HELM_CHART_DIR=../totem-food-service-helm-chart
 ################### AWS SSO
 ##############################################################################
 
-echo -e "\n########### SSO Login #####################\n"
-. ./sso_login.sh --profile $PROFILE
+# echo -e "\n########### SSO Login #####################\n"
+# . ./sso_login.sh --profile $PROFILE
 
 ##############################################################################
 ################### TOTEM FOOD SERVICE COMPONENTS - TERRAFORM
@@ -41,7 +41,6 @@ echo -e "\n########### SSO Login #####################\n"
 echo -e "\n########### TERRAFORM INIT #####################\n"
 cat << EOF > $TERRAFORM_COMPONENTS_DIR/terraform.tfvars.json
 {
-  "profile": "$PROFILE",
   "application_name": "$APP_NAME", 
   "environment": "$ENVIRONMENT", 
   "owner_team": "$OWNER_TEAM",
@@ -55,6 +54,8 @@ echo -e "\n########### TERRAFORM PLAN #####################\n"
 
 echo -e "\n########### TERRAFORM APPLY #####################\n"
 . ./terraform-apply.sh --dir $TERRAFORM_COMPONENTS_DIR
+
+exit
 
 echo -e "\n########### GETTING VARIABLES FROM TERRAFORM #####################\n"
 CLIENT_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_client_name)

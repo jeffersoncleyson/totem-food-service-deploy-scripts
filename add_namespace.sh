@@ -30,9 +30,11 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 ############################################################### END PARAMETERS READ
 
 ############################################################### INIT TASK
-COMAMND="kubectl create ns $NAMESPACE 2>&1"
+COMAMND="kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f - 2>&1"
 COMMAND_RETURNED=`eval ${COMAMND}`
 SUB=AlreadyExists
+
+echo "RETORNO: $COMMAND_RETURNED"
 
 if [[ "$COMMAND_RETURNED" == *"$SUB"* ]]; then
   echo "Namespace $NAMESPACE already exists"

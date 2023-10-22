@@ -1,0 +1,180 @@
+name: "Deploy Totem Food Service"
+
+on:
+  workflow_dispatch:
+    inputs:
+      applicationState:
+        description: 'Create or Delete application'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+        - create
+        - delete
+
+jobs:
+  terraform-modules:
+    runs-on: ubuntu-latest
+    env:
+      TERRAFORM_COMPONENTS_DIR: "./totem-food-service-tf-module-components"
+      HELM_CHART_DIR: "./totem-food-service-helm-chart"
+      WHITE_SPACE: "@"
+    steps:
+      - uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
+      - uses: sergeysova/jq-action@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Check out the repo
+        uses: actions/checkout@v3
+
+      - name: Cloning terraform module API Gateway
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-api-gateway.git -b main
+
+      - name: Cloning terraform module EKS
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-eks.git -b main
+
+      - name: Cloning terraform module Login
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-login.git -b main
+
+      - name: Cloning terraform module Cognito
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-cognito.git -b main
+
+      - name: Cloning terraform module Authorizer
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-authorizer.git -b main
+
+      - name: Cloning terraform module components
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-components.git -b main
+
+      - name: Cloning terraform module integration API Gateway and EKS
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-integration-api-gateway-and-eks.git -b main
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+
+      - name: Terraform Init components
+        id: init
+        continue-on-error: false
+        run: |
+          cat << EOF > ${{ env.TERRAFORM_COMPONENTS_DIR }}/terraform.tfvars.json
+          {
+            "application_name": "${{vars.APP_NAME}}", 
+            "environment": "${{vars.ENVIRONMENT}}", 
+            "owner_team": "${{vars.OWNER_TEAM}}",
+            "region": "${{vars.AWS_DEFAULT_REGION}}"
+          }
+          EOF
+          terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} init -reconfigure
+
+      - name: Install Lambda Authorizer Dependencies
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          npm install --prefix ./totem-food-service-tf-module-authorizer/lambda
+      
+      - name: Install Lambda Login Dependencies
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          npm install --prefix ./totem-food-service-tf-module-login/lambda
+
+      - name: Terraform Plan components
+        id: plan
+        continue-on-error: false
+        run: terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} plan
+
+      - name: Terraform Apply components
+        id: apply
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        continue-on-error: false
+        run: terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} apply -auto-approve
+
+      - name: Terraform Destroy components
+        id: destroy
+        if: ${{ github.event.inputs.applicationState == 'delete' }}
+        continue-on-error: false
+        run: terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} destroy -auto-approve
+
+
+      - name: Getting terraform componentes values
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          CLIENT_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_client_name)
+          echo "CLIENT_NAME=$CLIENT_NAME" >> $GITHUB_ENV
+
+          CLIENT_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_client_id)
+          echo "CLIENT_ID=$CLIENT_ID" >> $GITHUB_ENV
+
+          USER_POOL_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_user_pool_id)
+          echo "USER_POOL_ID=$USER_POOL_ID" >> $GITHUB_ENV
+
+          API_GATEWAY_STAGE_URL=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key api_gateway_url)
+          echo "API_GATEWAY_STAGE_URL=$API_GATEWAY_STAGE_URL" >> $GITHUB_ENV
+
+          API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK=$API_GATEWAY_STAGE_URL/v1/totem/payment/callback
+          echo "API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK" >> $GITHUB_ENV
+
+      - name: Getting AWS Cognito Client Secret
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          CLIENT_SECRET=$(. ./cognito_get_client_secret.sh --user-pool-id $USER_POOL_ID --client-name $CLIENT_NAME --client-id $CLIENT_ID)
+          echo "CLIENT_SECRET=$CLIENT_SECRET" >> $GITHUB_ENV
+
+      - name: Configuring EKS Context
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          CLUSTER_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cluster_eks_name)
+          . ./add_eks.sh --cluster-name $CLUSTER_NAME --region ${{ vars.AWS_DEFAULT_REGION }} 
+
+      - name: Configuring EKS Namespace
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          . ./add_namespace.sh --namespace ${{vars.NAMESPACE}}
+
+      - name: Reload Core DNS
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          ./restart_deployment.sh -dn coredns -n kube-system
+
+      - name: Cloning Helm Chart Repository
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-helm-chart.git -b main
+
+      - name: Releasing Helm Charts
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        uses: WyriHaximus/github-action-helm3@v3
+        with:
+          exec: |
+            MONGO_CHART=mongodb-chart
+            . ./helm_chart_create_release.sh --release mongo --dir $HELM_CHART_DIR/$MONGO_CHART --namespace ${{vars.NAMESPACE}}
+
+            MAILHOG_CHART=mailhog-chart
+            . ./helm_chart_create_release.sh --release mailhog --dir $HELM_CHART_DIR/$MAILHOG_CHART --namespace ${{vars.NAMESPACE}}
+
+            PAYMENT_GATEWAY_CHART=payment-gateway-chart
+            . ./helm_chart_create_release.sh --release payment --dir $HELM_CHART_DIR/$PAYMENT_GATEWAY_CHART --namespace ${{vars.NAMESPACE}}
+
+            TOTEM_FOOD_CHART=totem-food-chart
+            VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }},secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id=${{ secrets.STORE_TOKEN_ID }}
+            . ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace ${{vars.NAMESPACE}} --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE

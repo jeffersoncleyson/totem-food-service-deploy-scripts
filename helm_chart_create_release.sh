@@ -69,10 +69,11 @@ then
 fi
 
 FILE="$HELM_STATE_DIR/release-$RELEASE_NAME-namespace-$NAMESPACE.txt"
+COMMAND_RETURNED=`eval ${COMAMND}`
 SUB="Error"
+REUSE="re-use"
 
-if [ ! -f "$FILE" ]; then
-  COMMAND_RETURNED=`eval ${COMAMND}`
+if [ ! -f "$FILE" ] && [[ "$COMMAND_RETURNED" != *"$REUSE"* ]]; then
   if [[ "$COMMAND_RETURNED" == *"$SUB"* ]]; then
     echo $COMMAND_RETURNED
     exit 0

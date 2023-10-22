@@ -43,7 +43,18 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 ############################################################### END PARAMETERS READ
 
 ############################################################### INIT TASK
-COMAMND="aws eks update-kubeconfig --name $CLUSTER_NAME --profile $PROFILE --region $REGION"
+
+############################################################################
+#### Considering the AWS CLI will run without specify the profile
+############################################################################
+if [ -z "$PROFILE" ]
+then
+  COMAMND="aws eks update-kubeconfig --name $CLUSTER_NAME --region $REGION"
+else
+  COMAMND="aws eks update-kubeconfig --name $CLUSTER_NAME --profile $PROFILE --region $REGION"
+fi
+############################################################################
+
 
 FILE="$EKS_STATE_DIR/eks-$CLUSTER_NAME-updated.txt"
 SUB="Error"
