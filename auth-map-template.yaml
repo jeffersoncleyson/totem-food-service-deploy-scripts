@@ -1,0 +1,16 @@
+apiVersion: v1
+data:
+  mapRoles: |
+    - rolearn: arn:aws:iam::ACCOUND_ID:role/APP_NAME-iam-node-groups
+      username: system:node:{{EC2PrivateDNSName}}
+      groups:
+        - system:bootstrappers
+        - system:nodes
+    - rolearn: arn:aws:iam::ACCOUND_ID:role/SSO_ROLE
+      username: SSO_USERNAME
+      groups:
+        - system:masters  
+kind: ConfigMap
+metadata:
+  name: aws-auth
+  namespace: kube-system

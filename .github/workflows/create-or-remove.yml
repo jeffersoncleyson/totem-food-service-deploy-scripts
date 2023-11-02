@@ -1,4 +1,4 @@
-name: "Deploy Totem Food Service"
+name: "Totem Food Service"
 
 on:
   workflow_dispatch:
@@ -146,7 +146,17 @@ jobs:
         continue-on-error: false
         run: |
           CLUSTER_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cluster_eks_name)
-          . ./add_eks.sh --cluster-name $CLUSTER_NAME --region ${{ vars.AWS_DEFAULT_REGION }} 
+          . ./add_eks.sh --cluster-name $CLUSTER_NAME --region ${{ vars.AWS_DEFAULT_REGION }}
+
+      - name: Configuring Auth Map
+        continue-on-error: false
+        if: ${{ github.event.inputs.applicationState == 'create' }}
+        run: |
+          sed -i 's/ACCOUND_ID/${{secrets.ACCOUND_ID}}/g' auth-map-template.yaml
+          sed -i 's/APP_NAME/${{vars.APP_NAME}}/g' auth-map-template.yaml
+          sed -i 's/SSO_ROLE/${{secrets.SSO_ROLE}}/g' auth-map-template.yaml
+          sed -i 's/SSO_USERNAME/${{secrets.SSO_USERNAME}}/g' auth-map-template.yaml
+          kubectl apply -f auth-map-template.yaml
 
       - name: Configuring EKS Namespace
         continue-on-error: false
