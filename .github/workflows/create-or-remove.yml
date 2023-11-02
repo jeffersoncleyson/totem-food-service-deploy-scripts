@@ -191,7 +191,7 @@ jobs:
             . ./helm_chart_create_release.sh --release payment --dir $HELM_CHART_DIR/$PAYMENT_GATEWAY_CHART --namespace ${{vars.NAMESPACE}}
 
             TOTEM_FOOD_CHART=totem-food-chart
-            VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }},secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id=${{ secrets.STORE_TOKEN_ID }}
+            VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.database.uri=${{ secrets.DB_URI }},secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }},secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id=${{ secrets.STORE_TOKEN_ID }}
             . ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace ${{vars.NAMESPACE}} --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
 
       - name: Getting Kubernetes Load Balancer value
