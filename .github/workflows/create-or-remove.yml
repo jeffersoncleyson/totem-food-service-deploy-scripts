@@ -23,7 +23,7 @@ jobs:
       TERRAFORM_COMPONENTS_DIR: "./totem-food-service-tf-module-components"
       TERRAFORM_INTEGRATION_DIR: "./totem-food-service-tf-module-integration-api-gateway-and-eks"
       HELM_CHART_DIR: "./totem-food-service-helm-chart"
-      WHITE_SPACE: "@"
+      WHITE_SPACE: "#"
     steps:
       - uses: hashicorp/setup-terraform@v2
         with:
@@ -118,7 +118,6 @@ jobs:
 
       - name: Getting terraform componentes values
         continue-on-error: false
-        if: ${{ github.event.inputs.applicationState == 'create' }}
         run: |
           CLIENT_NAME=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_client_name)
           echo "CLIENT_NAME=$CLIENT_NAME" >> $GITHUB_ENV
@@ -137,7 +136,6 @@ jobs:
 
       - name: Getting AWS Cognito Client Secret
         continue-on-error: false
-        if: ${{ github.event.inputs.applicationState == 'create' }}
         run: |
           CLIENT_SECRET=$(. ./cognito_get_client_secret.sh --user-pool-id $USER_POOL_ID --client-name $CLIENT_NAME --client-id $CLIENT_ID)
           echo "CLIENT_SECRET=$CLIENT_SECRET" >> $GITHUB_ENV
@@ -181,22 +179,17 @@ jobs:
         uses: WyriHaximus/github-action-helm3@v3
         with:
           exec: |
-            MONGO_CHART=mongodb-chart
-            . ./helm_chart_create_release.sh --release mongo --dir $HELM_CHART_DIR/$MONGO_CHART --namespace ${{vars.NAMESPACE}}
-
             MAILHOG_CHART=mailhog-chart
             . ./helm_chart_create_release.sh --release mailhog --dir $HELM_CHART_DIR/$MAILHOG_CHART --namespace ${{vars.NAMESPACE}}
 
-            PAYMENT_GATEWAY_CHART=payment-gateway-chart
-            . ./helm_chart_create_release.sh --release payment --dir $HELM_CHART_DIR/$PAYMENT_GATEWAY_CHART --namespace ${{vars.NAMESPACE}}
-
             TOTEM_FOOD_CHART=totem-food-chart
-            VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.database.uri=${{ secrets.DB_URI }},secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }},secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id=${{ secrets.STORE_TOKEN_ID }}
+            VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }},secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id="\"${{ secrets.STORE_TOKEN_ID }}\"",secrets.database.uri="\"${{ secrets.DB_URI }}\""
             . ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace ${{vars.NAMESPACE}} --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
 
       - name: Getting Kubernetes Load Balancer value
         continue-on-error: false
         run: |
+          sleep 30
           SVC_PRIVATE_LB="totem-totem-food-service-lb-private"
           DNS_NAME=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB --namespace ${{vars.NAMESPACE}})
           LB_ARN=$(. ./load_balancer_get_attributes.sh --region ${{ vars.AWS_DEFAULT_REGION }} --dns-name $DNS_NAME)
@@ -261,9 +254,7 @@ jobs:
         continue-on-error: false
         run: |
           . ./helm_chart_delete_release.sh --release totem --namespace ${{vars.NAMESPACE}}
-          . ./helm_chart_delete_release.sh --release payment --namespace ${{vars.NAMESPACE}}
           . ./helm_chart_delete_release.sh --release mailhog --namespace ${{vars.NAMESPACE}}
-          . ./helm_chart_delete_release.sh --release mongo --namespace ${{vars.NAMESPACE}}
           terraform -chdir=$TERRAFORM_INTEGRATION_DIR destroy -auto-approve
           terraform -chdir=$TERRAFORM_COMPONENTS_DIR destroy -auto-approve
 

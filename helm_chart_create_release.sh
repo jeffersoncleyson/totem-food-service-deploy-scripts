@@ -54,7 +54,6 @@ set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 
 ############################################################### INIT TASK
 
-
 if [ -z "$VALUES_TO_SET" ]
 then
   COMAMND="helm install $RELEASE_NAME $HELM_DIR --namespace $NAMESPACE 2>&1"
