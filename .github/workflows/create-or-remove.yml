@@ -11,6 +11,9 @@ on:
         options:
         - create
         - delete
+      customerName:
+        description: 'Customer Name'
+        required: true
 
 permissions:
   id-token: write
@@ -182,19 +185,43 @@ jobs:
             MAILHOG_CHART=mailhog-chart
             . ./helm_chart_create_release.sh --release mailhog --dir $HELM_CHART_DIR/$MAILHOG_CHART --namespace ${{vars.NAMESPACE}}
 
+            TOTEM_FOOD_RELEASE_NAME="${{ github.event.inputs.customerName }}"
             TOTEM_FOOD_CHART=totem-food-chart
-            VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }},secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id="\"${{ secrets.STORE_TOKEN_ID }}\"",secrets.database.uri="\"${{ secrets.DB_URI }}\""
-            . ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace ${{vars.NAMESPACE}} --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
+
+            SUBCHART_CUSTOMER=totem-food-customer-service
+            VALUES_TO_SET_CUSTOMER=$SUBCHART_CUSTOMER.image.tag=v4-beta,$SUBCHART_CUSTOMER.image.pullPolicy=Always,$SUBCHART_CUSTOMER.secrets.cognito.userPoolId=$USER_POOL_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientId=$CLIENT_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientSecret=$CLIENT_SECRET
+
+            SUBCHART_ORDER=totem-food-order-service
+            VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=v4-beta,$SUBCHART_ORDER.image.pullPolicy=Always,$SUBCHART_ORDER.secrets.database.uri="\"${{ secrets.DB_URI }}\""
+
+            SUBCHART_PAYMENT=totem-food-payment-service
+            VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},secrets.payment.gateway.store_id=${{ vars.STORE_ID }}secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},secrets.payment.gateway.store_token_id="\"${{ secrets.STORE_TOKEN_ID }}\"",$SUBCHART_PAYMENT.secrets.database.uri="\"${{ secrets.DB_URI }}\""
+
+            VALUES_TO_SET=$VALUES_TO_SET_ORDER,$VALUES_TO_SET_CUSTOMER,$VALUES_TO_SET_PAYMENT
+            . ./helm_chart_create_release.sh --release $TOTEM_FOOD_RELEASE_NAME --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace ${{vars.NAMESPACE}} --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
+
 
       - name: Getting Kubernetes Load Balancer value
         continue-on-error: false
         run: |
           sleep 30
-          SVC_PRIVATE_LB="totem-totem-food-service-lb-private"
-          DNS_NAME=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB --namespace ${{vars.NAMESPACE}})
-          LB_ARN=$(. ./load_balancer_get_attributes.sh --region ${{ vars.AWS_DEFAULT_REGION }} --dns-name $DNS_NAME)
-          LISTENER_ARN=$(. ./describe_load_balancer_lister.sh --region ${{ vars.AWS_DEFAULT_REGION }} --load-balancer-arn $LB_ARN)
-          echo "LISTENER_ARN=$LISTENER_ARN" >> $GITHUB_ENV
+          SVC_PRIVATE_LB_CUSTOMER="${{ github.event.inputs.customerName }}-tfc-svc-lb-private"
+          DNS_NAME_CUSTOMER=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB_CUSTOMER --namespace ${{vars.NAMESPACE}})
+          LB_ARN_CUSTOMER=$(. ./load_balancer_get_attributes.sh --region ${{ vars.AWS_DEFAULT_REGION }} --dns-name $DNS_NAME_CUSTOMER)
+          LISTENER_ARN_CUSTOMER=$(. ./describe_load_balancer_lister.sh --region ${{ vars.AWS_DEFAULT_REGION }} --load-balancer-arn $LB_ARN_CUSTOMER)
+          echo "LISTENER_ARN_CUSTOMER=$LISTENER_ARN_CUSTOMER" >> $GITHUB_ENV
+
+          SVC_PRIVATE_LB_PAYMENT="${{ github.event.inputs.customerName }}-tfp-svc-lb-private"
+          DNS_NAME_PAYMENT=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB_PAYMENT --namespace ${{vars.NAMESPACE}})
+          LB_ARN_PAYMENT=$(. ./load_balancer_get_attributes.sh --region ${{ vars.AWS_DEFAULT_REGION }} --dns-name $DNS_NAME_PAYMENT)
+          LISTENER_ARN_PAYMENT=$(. ./describe_load_balancer_lister.sh --region ${{ vars.AWS_DEFAULT_REGION }} --load-balancer-arn $LB_ARN_PAYMENT)
+          echo "LISTENER_ARN_PAYMENT=$LISTENER_ARN_PAYMENT" >> $GITHUB_ENV
+
+          SVC_PRIVATE_LB_ORDER="${{ github.event.inputs.customerName }}-tfo-svc-lb-private"
+          DNS_NAME_ORDER=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB_ORDER --namespace ${{vars.NAMESPACE}})
+          LB_ARN_ORDER=$(. ./load_balancer_get_attributes.sh --region ${{ vars.AWS_DEFAULT_REGION }} --dns-name $DNS_NAME)
+          LISTENER_ORDER_ARN=$(. ./describe_load_balancer_lister.sh --region ${{ vars.AWS_DEFAULT_REGION }} --load-balancer-arn $LB_ARN_ORDER)
+          echo "LISTENER_ARN_ORDER=$LISTENER_ARN_ORDER" >> $GITHUB_ENV
 
       - name: Getting Integration values
         continue-on-error: false
@@ -229,7 +256,9 @@ jobs:
             "region": "${{ vars.AWS_DEFAULT_REGION }}",
             "vpc_security_group_eks_ids": ["${{ env.CLUSTER_EKS_VPC_LINK }}"], 
             "eks_private_subnet_ids": ["${{ env.CLUSTER_EKS_PRIVATE_SUBNET_ONE }}", "${{ env.CLUSTER_EKS_PRIVATE_SUBNET_TWO }}"], 
-            "eks_private_load_balancer_arn": "${{ env.LISTENER_ARN }}",
+            "eks_private_load_balancer_arn_customer": "${{ env.LISTENER_ARN_CUSTOMER }}",
+            "eks_private_load_balancer_arn_payment": "${{ env.LISTENER_ARN_PAYMENT }}",
+            "eks_private_load_balancer_arn_order": "${{ env.LISTENER_ARN_ORDER }}",
             "aws_apigatewayv2_api_restrict_api_id": "${{ env.API_GATEWAY_RESTRICT_API_ID }}",
             "aws_apigatewayv2_authorizer_authorizer_id": "${{ env.API_GATEWAY_AUTORIZER_ID }}",
             "aws_apigatewayv2_vpc_link_eks_id": "${{ env.API_GATEWAY_VPC_LINK_ID }}"
@@ -253,7 +282,8 @@ jobs:
         if: ${{ github.event.inputs.applicationState == 'delete' }}
         continue-on-error: false
         run: |
-          . ./helm_chart_delete_release.sh --release totem --namespace ${{vars.NAMESPACE}}
+          TOTEM_FOOD_RELEASE_NAME="${{ github.event.inputs.customerName }}"
+          . ./helm_chart_delete_release.sh --release $TOTEM_FOOD_RELEASE_NAME --namespace ${{vars.NAMESPACE}}
           . ./helm_chart_delete_release.sh --release mailhog --namespace ${{vars.NAMESPACE}}
           terraform -chdir=$TERRAFORM_INTEGRATION_DIR destroy -auto-approve
           terraform -chdir=$TERRAFORM_COMPONENTS_DIR destroy -auto-approve
