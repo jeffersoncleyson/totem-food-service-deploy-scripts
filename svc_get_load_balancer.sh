@@ -34,5 +34,5 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
 ############################################################### END PARAMETERS READ
 
-COMMAND_RETURNED=$(kubectl get svc -n $NAMESPACE --output json)
-echo $COMMAND_RETURNED | jq -c '[ .items[] | select( .metadata.name | contains("'$SERVICE_NAME'")) ][].status.loadBalancer.ingress[].hostname' | sed 's/\"//g'
+COMMAND_RETURNED=$(kubectl get svc $SERVICE_NAME -n $NAMESPACE --output json)
+echo $COMMAND_RETURNED | jq -c '.status.loadBalancer.ingress[].hostname' | sed 's/\"//g'

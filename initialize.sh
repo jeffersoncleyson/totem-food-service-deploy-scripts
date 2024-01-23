@@ -91,9 +91,21 @@ MAILHOG_CHART=mailhog-chart
 PAYMENT_GATEWAY_CHART=payment-gateway-chart
 . ./helm_chart_create_release.sh --release payment --dir $HELM_CHART_DIR/$PAYMENT_GATEWAY_CHART --namespace $NAMESPACE
 
+# CUSTOMER RANDOM : $(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 8 | head -n 1)
+TOTEM_FOOD_RELEASE_NAME=customer
 TOTEM_FOOD_CHART=totem-food-chart
-VALUES_TO_SET=image.tag=temporary,image.pullPolicy=Always,secrets.cognito.userPoolId=$USER_POOL_ID,secrets.cognito.clientId=$CLIENT_ID,secrets.cognito.clientSecret=$CLIENT_SECRET,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,secrets.payment.gateway.store_id=$STORE_ID,secrets.payment.gateway.store_user_id=$STORE_USER_ID,secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
-. ./helm_chart_create_release.sh --release totem --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace $NAMESPACE --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
+
+SUBCHART_CUSTOMER=totem-food-customer-service
+VALUES_TO_SET_CUSTOMER=$SUBCHART_CUSTOMER.image.tag=v4-beta,$SUBCHART_CUSTOMER.image.pullPolicy=Always,$SUBCHART_CUSTOMER.secrets.cognito.userPoolId=$USER_POOL_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientId=$CLIENT_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientSecret=$CLIENT_SECRET
+
+SUBCHART_ORDER=totem-food-order-service
+VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=v4-beta,$SUBCHART_ORDER.image.pullPolicy=Always
+
+SUBCHART_PAYMENT=totem-food-payment-service
+VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,secrets.payment.gateway.store_id=$STORE_ID,secrets.payment.gateway.store_user_id=$STORE_USER_ID,secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
+
+VALUES_TO_SET=$VALUES_TO_SET_ORDER,$VALUES_TO_SET_CUSTOMER,$VALUES_TO_SET_PAYMENT
+. ./helm_chart_create_release.sh --release $TOTEM_FOOD_RELEASE_NAME --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace $NAMESPACE --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
 
 echo -e "\n########### RESTARTING DEPLOYMENT #####################\n"
 ./restart_deployment.sh -dn coredns -n kube-system
@@ -102,16 +114,38 @@ echo -e "\n########### RESTARTING DEPLOYMENT #####################\n"
 ################### INTEGRATION EKS AND API GATEWAY - AWS VARIABLES
 ##############################################################################
 
+################### CUSTOMER LB
 echo -e "\n########### GETTING KUBERNETES LOAD BALANCER DNS #####################\n"
-SVC_PRIVATE_LB="totem-totem-food-service-lb-private"
-DNS_NAME=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB --namespace $NAMESPACE)
+SVC_PRIVATE_LB_CUSTOMER=$TOTEM_FOOD_RELEASE_NAME"-tfc-svc-lb-private"
+DNS_NAME_CUSTOMER=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB_CUSTOMER --namespace $NAMESPACE)
 
 echo -e "\n########### GETTING AWS LOAD BALANCER ARN #####################\n"
-LB_ARN=$(. ./load_balancer_get_attributes.sh --profile $PROFILE --region $REGION --dns-name $DNS_NAME)
+LB_ARN_CUSTOMER=$(. ./load_balancer_get_attributes.sh --profile $PROFILE --region $REGION --dns-name $DNS_NAME_CUSTOMER)
 
 echo -e "\n########### GETTING AWS LOAD BALANCER LISTENER ARN #####################\n"
-LISTENER_ARN=$(. ./describe_load_balancer_lister.sh --profile $PROFILE --region $REGION --load-balancer-arn $LB_ARN)
+LISTENER_ARN_CUSTOMER=$(. ./describe_load_balancer_lister.sh --profile $PROFILE --region $REGION --load-balancer-arn $LB_ARN_CUSTOMER)
 
+################### PAYMENT LB
+echo -e "\n########### GETTING KUBERNETES LOAD BALANCER DNS #####################\n"
+SVC_PRIVATE_LB_PAYMENT=$TOTEM_FOOD_RELEASE_NAME"-tfp-svc-lb-private"
+DNS_NAME_PAYMENT=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB_PAYMENT --namespace $NAMESPACE)
+
+echo -e "\n########### GETTING AWS LOAD BALANCER ARN #####################\n"
+LB_ARN_PAYMENT=$(. ./load_balancer_get_attributes.sh --profile $PROFILE --region $REGION --dns-name $DNS_NAME_PAYMENT)
+
+echo -e "\n########### GETTING AWS LOAD BALANCER LISTENER ARN #####################\n"
+LISTENER_ARN_PAYMENT=$(. ./describe_load_balancer_lister.sh --profile $PROFILE --region $REGION --load-balancer-arn $LB_ARN_PAYMENT)
+
+################### ORDER LB
+echo -e "\n########### GETTING KUBERNETES LOAD BALANCER DNS #####################\n"
+SVC_PRIVATE_LB_ORDER=$TOTEM_FOOD_RELEASE_NAME"-tfo-svc-lb-private"
+DNS_NAME_ORDER=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB_ORDER --namespace $NAMESPACE)
+
+echo -e "\n########### GETTING AWS LOAD BALANCER ARN #####################\n"
+LB_ARN_ORDER=$(. ./load_balancer_get_attributes.sh --profile $PROFILE --region $REGION --dns-name $DNS_NAME_ORDER)
+
+echo -e "\n########### GETTING AWS LOAD BALANCER LISTENER ARN #####################\n"
+LISTENER_ARN_ORDER=$(. ./describe_load_balancer_lister.sh --profile $PROFILE --region $REGION --load-balancer-arn $LB_ARN_ORDER)
 
 ##############################################################################
 ################### INTEGRATION EKS AND API GATEWAY - TERRAFORM
@@ -136,7 +170,9 @@ cat << EOF > $TERRAFORM_INTEGRATION_DIR/terraform.tfvars.json
   "region": "$REGION",
   "vpc_security_group_eks_ids": ["$CLUSTER_EKS_VPC_LINK"], 
   "eks_private_subnet_ids": ["$CLUSTER_EKS_PRIVATE_SUBNET_ONE", "$CLUSTER_EKS_PRIVATE_SUBNET_TWO"], 
-  "eks_private_load_balancer_arn": "$LISTENER_ARN",
+  "eks_private_load_balancer_arn_customer": "$LISTENER_ARN_CUSTOMER",
+  "eks_private_load_balancer_arn_payment": "$LISTENER_ARN_PAYMENT",
+  "eks_private_load_balancer_arn_order": "$LISTENER_ARN_ORDER",
   "aws_apigatewayv2_api_restrict_api_id": "$API_GATEWAY_RESTRICT_API_ID",
   "aws_apigatewayv2_authorizer_authorizer_id": "$API_GATEWAY_AUTORIZER_ID",
   "aws_apigatewayv2_vpc_link_eks_id": "$API_GATEWAY_VPC_LINK_ID"

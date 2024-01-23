@@ -1,10 +1,15 @@
 ### Helm Charts Releases
 NAMESPACE=totem-apps
 
-. ./helm_chart_delete_release.sh --release totem --namespace $NAMESPACE
-. ./helm_chart_delete_release.sh --release payment --namespace $NAMESPACE
-. ./helm_chart_delete_release.sh --release mailhog --namespace $NAMESPACE
-. ./helm_chart_delete_release.sh --release mongo --namespace $NAMESPACE
+TOTEM_FOOD_RELEASE_NAME=customer
+PAYMENT_RELEASE_NAME=payment
+MAILHOG_RELEASE_NAME=mailhog
+MONGO_RELEASE_NAME=mongo
+
+. ./helm_chart_delete_release.sh --release $TOTEM_FOOD_RELEASE_NAME --namespace $NAMESPACE
+. ./helm_chart_delete_release.sh --release $PAYMENT_RELEASE_NAME --namespace $NAMESPACE
+. ./helm_chart_delete_release.sh --release $MAILHOG_RELEASE_NAME --namespace $NAMESPACE
+. ./helm_chart_delete_release.sh --release $MONGO_RELEASE_NAME --namespace $NAMESPACE
 
 
 ### Destroy Terraform
