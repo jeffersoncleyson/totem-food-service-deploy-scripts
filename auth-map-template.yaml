@@ -9,7 +9,11 @@ data:
     - rolearn: arn:aws:iam::ACCOUND_ID:role/SSO_ROLE
       username: SSO_USERNAME
       groups:
-        - system:masters  
+        - system:masters 
+    - rolearn: arn:aws:sts::ACCOUND_ID:assumed-role/SSO_ROLE
+      username: SSO_USERNAME
+      groups:
+        - system:masters
 kind: ConfigMap
 metadata:
   name: aws-auth

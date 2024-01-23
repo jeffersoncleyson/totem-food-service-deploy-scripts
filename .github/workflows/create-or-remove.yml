@@ -221,7 +221,7 @@ jobs:
           DNS_NAME_ORDER=$(. ./svc_get_load_balancer.sh --service-name $SVC_PRIVATE_LB_ORDER --namespace ${{vars.NAMESPACE}})
           LB_ARN_ORDER=$(. ./load_balancer_get_attributes.sh --region ${{ vars.AWS_DEFAULT_REGION }} --dns-name $DNS_NAME_ORDER)
           LISTENER_ORDER_ARN=$(. ./describe_load_balancer_lister.sh --region ${{ vars.AWS_DEFAULT_REGION }} --load-balancer-arn $LB_ARN_ORDER)
-          echo "LISTENER_ARN_ORDER=$LISTENER_ARN_ORDER" >> $GITHUB_ENV
+          echo "LISTENER_ARN_ORDER=$LISTENER_ORDER_ARN" >> $GITHUB_ENV
 
       - name: Getting Integration values
         continue-on-error: false
