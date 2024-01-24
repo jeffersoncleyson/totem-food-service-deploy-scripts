@@ -13,6 +13,8 @@ STORE_ID=POSTOTEM001
 STORE_USER_ID=1481636739
 WHITE_SPACE=@
 STORE_TOKEN_ID="\"Bearer${WHITE_SPACE}TEST-TOKEN\""
+DB_USERNAME="root"
+DB_PASSWORD=$(cat /dev/urandom | tr -dc "a-z0-9" | fold -w  15 | head -n 1 | tr -d "\n")
 
 
 ### AWS Profile if you are using SSO
@@ -45,7 +47,11 @@ cat << EOF > $TERRAFORM_COMPONENTS_DIR/terraform.tfvars.json
   "application_name": "$APP_NAME", 
   "environment": "$ENVIRONMENT", 
   "owner_team": "$OWNER_TEAM",
-  "region": "$REGION"
+  "region": "$REGION",
+  "db_username": $DB_USERNAME,
+  "db_password": $DB_PASSWORD,
+  "db_identifier": "totem-food-service",
+  "db_storage": 20
 }
 EOF
 . ./terraform-init.sh --dir $TERRAFORM_COMPONENTS_DIR
@@ -62,6 +68,7 @@ CLIENT_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cog
 USER_POOL_ID=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key cognito_user_pool_id)
 API_GATEWAY_STAGE_URL=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key api_gateway_url)
 API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK=$API_GATEWAY_STAGE_URL/v1/totem/payment/callback
+DB_ENDPOINT=$(. ./value-from-terrafom.sh --dir $TERRAFORM_COMPONENTS_DIR --key db_instance_endpoint)
 
 echo -e "\n########### GETTING CLIENT SECRET #####################\n"
 CLIENT_SECRET=$(. ./cognito_get_client_secret.sh --profile $PROFILE --user-pool-id $USER_POOL_ID --client-name $CLIENT_NAME --client-id $CLIENT_ID)
@@ -102,7 +109,8 @@ SUBCHART_ORDER=totem-food-order-service
 VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=v4-beta,$SUBCHART_ORDER.image.pullPolicy=Always
 
 SUBCHART_PAYMENT=totem-food-payment-service
-VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,secrets.payment.gateway.store_id=$STORE_ID,secrets.payment.gateway.store_user_id=$STORE_USER_ID,secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
+SECRETS_DATABASE="$SUBCHART_PAYMENT.secrets.database.url=jdbc:mysql://$DB_ENDPOINT/db_payment?createDatabaseIfNotExist=true,$SUBCHART_PAYMENT.secrets.database.username=$DB_USERNAME,$SUBCHART_PAYMENT.secrets.database.password=$DB_PASSWORD"
+VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,$SECRETS_DATABASE,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,secrets.payment.gateway.store_id=$STORE_ID,secrets.payment.gateway.store_user_id=$STORE_USER_ID,secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
 
 VALUES_TO_SET=$VALUES_TO_SET_ORDER,$VALUES_TO_SET_CUSTOMER,$VALUES_TO_SET_PAYMENT
 . ./helm_chart_create_release.sh --release $TOTEM_FOOD_RELEASE_NAME --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace $NAMESPACE --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
