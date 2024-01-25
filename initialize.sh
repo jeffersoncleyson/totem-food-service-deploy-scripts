@@ -48,8 +48,8 @@ cat << EOF > $TERRAFORM_COMPONENTS_DIR/terraform.tfvars.json
   "environment": "$ENVIRONMENT", 
   "owner_team": "$OWNER_TEAM",
   "region": "$REGION",
-  "db_username": $DB_USERNAME,
-  "db_password": $DB_PASSWORD,
+  "db_username": "$DB_USERNAME",
+  "db_password": "$DB_PASSWORD",
   "db_identifier": "totem-food-service",
   "db_storage": 20
 }

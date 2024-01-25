@@ -90,7 +90,11 @@ jobs:
             "application_name": "${{vars.APP_NAME}}", 
             "environment": "${{vars.ENVIRONMENT}}", 
             "owner_team": "${{vars.OWNER_TEAM}}",
-            "region": "${{vars.AWS_DEFAULT_REGION}}"
+            "region": "${{vars.AWS_DEFAULT_REGION}}",
+            "db_username": "${{secrets.DB_USERNAME}}",,
+            "db_password": "${{secrets.DB_PASSWORD}}",,
+            "db_identifier": "totem-food-service",
+            "db_storage": 20
           }
           EOF
           terraform -chdir=${{ env.TERRAFORM_COMPONENTS_DIR }} init -reconfigure
