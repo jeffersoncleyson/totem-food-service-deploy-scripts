@@ -110,7 +110,7 @@ VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=v4-beta,$SUBCHART_ORDER.image.pull
 
 SUBCHART_PAYMENT=totem-food-payment-service
 SECRETS_DATABASE="$SUBCHART_PAYMENT.secrets.database.url=jdbc:mysql://$DB_ENDPOINT/db_payment?createDatabaseIfNotExist=true,$SUBCHART_PAYMENT.secrets.database.username=$DB_USERNAME,$SUBCHART_PAYMENT.secrets.database.password=$DB_PASSWORD"
-VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,$SECRETS_DATABASE,secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,secrets.payment.gateway.store_id=$STORE_ID,secrets.payment.gateway.store_user_id=$STORE_USER_ID,secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
+VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,$SECRETS_DATABASE,$SUBCHART_PAYMENT.secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,$SUBCHART_PAYMENT.secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,$SUBCHART_PAYMENT.secrets.payment.gateway.store_id=$STORE_ID,$SUBCHART_PAYMENT.secrets.payment.gateway.store_user_id=$STORE_USER_ID,$SUBCHART_PAYMENT.secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
 
 VALUES_TO_SET=$VALUES_TO_SET_ORDER,$VALUES_TO_SET_CUSTOMER,$VALUES_TO_SET_PAYMENT
 . ./helm_chart_create_release.sh --release $TOTEM_FOOD_RELEASE_NAME --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace $NAMESPACE --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
