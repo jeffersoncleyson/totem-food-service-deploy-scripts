@@ -14,6 +14,18 @@ on:
       customerName:
         description: 'Customer Name'
         required: true
+      tfcImage:
+        description: 'Totem Food Customer Image version'
+        default: 'latest'
+        required: true
+      tfoImage:
+        description: 'Totem Food Order Image version'
+        default: 'latest'
+        required: true
+      tfpImage:
+        description: 'Totem Food Payment Image version'
+        default: 'latest'
+        required: true
 
 permissions:
   id-token: write
@@ -196,14 +208,14 @@ jobs:
             TOTEM_FOOD_CHART=totem-food-chart
 
             SUBCHART_CUSTOMER=totem-food-customer-service
-            VALUES_TO_SET_CUSTOMER=$SUBCHART_CUSTOMER.image.tag=v4-beta,$SUBCHART_CUSTOMER.image.pullPolicy=Always,$SUBCHART_CUSTOMER.secrets.cognito.userPoolId=$USER_POOL_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientId=$CLIENT_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientSecret=$CLIENT_SECRET
+            VALUES_TO_SET_CUSTOMER=$SUBCHART_CUSTOMER.image.tag=${{ github.event.inputs.tfcImage }},$SUBCHART_CUSTOMER.image.pullPolicy=Always,$SUBCHART_CUSTOMER.secrets.cognito.userPoolId=$USER_POOL_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientId=$CLIENT_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientSecret=$CLIENT_SECRET
 
             SUBCHART_ORDER=totem-food-order-service
-            VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=v4-beta,$SUBCHART_ORDER.image.pullPolicy=Always,$SUBCHART_ORDER.secrets.database.uri="\"${{ secrets.DB_URI }}\""
+            VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=${{ github.event.inputs.tfoImage }},$SUBCHART_ORDER.image.pullPolicy=Always,$SUBCHART_ORDER.secrets.database.uri="\"${{ secrets.DB_URI }}\""
 
             SUBCHART_PAYMENT=totem-food-payment-service
             SECRETS_DATABASE="$SUBCHART_PAYMENT.secrets.database.url=jdbc:mysql://$DB_ENDPOINT/db_payment?createDatabaseIfNotExist=true,$SUBCHART_PAYMENT.secrets.database.username=${{secrets.DB_USERNAME}},$SUBCHART_PAYMENT.secrets.database.password=${{secrets.DB_PASSWORD}}"
-            VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,$SECRETS_DATABASE,$SUBCHART_PAYMENT.secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,$SUBCHART_PAYMENT.secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},$SUBCHART_PAYMENT.secrets.payment.gateway.store_id=${{ vars.STORE_ID }},$SUBCHART_PAYMENT.secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},$SUBCHART_PAYMENT.secrets.payment.gateway.store_token_id="\"${{ secrets.STORE_TOKEN_ID }}\"",$SUBCHART_PAYMENT.secrets.database.uri="\"${{ secrets.DB_URI }}\""
+            VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=${{ github.event.inputs.tfpImage }},$SUBCHART_PAYMENT.image.pullPolicy=Always,$SECRETS_DATABASE,$SUBCHART_PAYMENT.secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,$SUBCHART_PAYMENT.secrets.payment.gateway.url=${{ vars.MERCADO_PAGO_PAYMENT_GATEWAY }},$SUBCHART_PAYMENT.secrets.payment.gateway.store_id=${{ vars.STORE_ID }},$SUBCHART_PAYMENT.secrets.payment.gateway.store_user_id=${{ vars.STORE_USER_ID }},$SUBCHART_PAYMENT.secrets.payment.gateway.store_token_id="\"${{ secrets.STORE_TOKEN_ID }}\"",$SUBCHART_PAYMENT.secrets.database.uri="\"${{ secrets.DB_URI }}\""
 
             VALUES_TO_SET=$VALUES_TO_SET_ORDER,$VALUES_TO_SET_CUSTOMER,$VALUES_TO_SET_PAYMENT
             . ./helm_chart_create_release.sh --release $TOTEM_FOOD_RELEASE_NAME --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace ${{vars.NAMESPACE}} --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
