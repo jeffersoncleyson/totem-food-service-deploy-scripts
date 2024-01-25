@@ -16,6 +16,10 @@ STORE_TOKEN_ID="\"Bearer${WHITE_SPACE}TEST-TOKEN\""
 DB_USERNAME="root"
 DB_PASSWORD=$(cat /dev/urandom | tr -dc "a-z0-9" | fold -w  15 | head -n 1 | tr -d "\n")
 
+TFC_IMAGE_VERSION=v4-beta
+TFO_IMAGE_VERSION=v4-beta
+TFP_IMAGE_VERSION=latest
+
 
 ### AWS Profile if you are using SSO
 ### In case of AWS credials comment this variable
@@ -103,14 +107,14 @@ TOTEM_FOOD_RELEASE_NAME=customer
 TOTEM_FOOD_CHART=totem-food-chart
 
 SUBCHART_CUSTOMER=totem-food-customer-service
-VALUES_TO_SET_CUSTOMER=$SUBCHART_CUSTOMER.image.tag=v4-beta,$SUBCHART_CUSTOMER.image.pullPolicy=Always,$SUBCHART_CUSTOMER.secrets.cognito.userPoolId=$USER_POOL_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientId=$CLIENT_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientSecret=$CLIENT_SECRET
+VALUES_TO_SET_CUSTOMER=$SUBCHART_CUSTOMER.image.tag=$TFC_IMAGE_VERSION,$SUBCHART_CUSTOMER.image.pullPolicy=Always,$SUBCHART_CUSTOMER.secrets.cognito.userPoolId=$USER_POOL_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientId=$CLIENT_ID,$SUBCHART_CUSTOMER.secrets.cognito.clientSecret=$CLIENT_SECRET
 
 SUBCHART_ORDER=totem-food-order-service
-VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=v4-beta,$SUBCHART_ORDER.image.pullPolicy=Always
+VALUES_TO_SET_ORDER=$SUBCHART_ORDER.image.tag=$TFO_IMAGE_VERSION,$SUBCHART_ORDER.image.pullPolicy=Always
 
 SUBCHART_PAYMENT=totem-food-payment-service
 SECRETS_DATABASE="$SUBCHART_PAYMENT.secrets.database.url=jdbc:mysql://$DB_ENDPOINT/db_payment?createDatabaseIfNotExist=true,$SUBCHART_PAYMENT.secrets.database.username=$DB_USERNAME,$SUBCHART_PAYMENT.secrets.database.password=$DB_PASSWORD"
-VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=v4-beta,$SUBCHART_PAYMENT.image.pullPolicy=Always,$SECRETS_DATABASE,$SUBCHART_PAYMENT.secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,$SUBCHART_PAYMENT.secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,$SUBCHART_PAYMENT.secrets.payment.gateway.store_id=$STORE_ID,$SUBCHART_PAYMENT.secrets.payment.gateway.store_user_id=$STORE_USER_ID,$SUBCHART_PAYMENT.secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
+VALUES_TO_SET_PAYMENT=$SUBCHART_PAYMENT.image.tag=$TFP_IMAGE_VERSION,$SUBCHART_PAYMENT.image.pullPolicy=Always,$SECRETS_DATABASE,$SUBCHART_PAYMENT.secrets.payment.gateway.callback=$API_GATEWAY_STAGE_URL_PAYMENT_CALLBACK,$SUBCHART_PAYMENT.secrets.payment.gateway.url=$MERCADO_PAGO_PAYMENT_GATEWAY,$SUBCHART_PAYMENT.secrets.payment.gateway.store_id=$STORE_ID,$SUBCHART_PAYMENT.secrets.payment.gateway.store_user_id=$STORE_USER_ID,$SUBCHART_PAYMENT.secrets.payment.gateway.store_token_id=$STORE_TOKEN_ID
 
 VALUES_TO_SET=$VALUES_TO_SET_ORDER,$VALUES_TO_SET_CUSTOMER,$VALUES_TO_SET_PAYMENT
 . ./helm_chart_create_release.sh --release $TOTEM_FOOD_RELEASE_NAME --dir $HELM_CHART_DIR/$TOTEM_FOOD_CHART --namespace $NAMESPACE --values-to-set $VALUES_TO_SET --white-space $WHITE_SPACE
