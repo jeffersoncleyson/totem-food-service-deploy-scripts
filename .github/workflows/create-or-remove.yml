@@ -108,8 +108,8 @@ jobs:
             "environment": "${{vars.ENVIRONMENT}}", 
             "owner_team": "${{vars.OWNER_TEAM}}",
             "region": "${{vars.AWS_DEFAULT_REGION}}",
-            "db_username": "${{secrets.DB_USERNAME}}",,
-            "db_password": "${{secrets.DB_PASSWORD}}",,
+            "db_username": "${{secrets.DB_USERNAME}}",
+            "db_password": "${{secrets.DB_PASSWORD}}",
             "db_identifier": "totem-food-service",
             "db_storage": 20
           }
