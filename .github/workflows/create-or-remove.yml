@@ -86,6 +86,11 @@ jobs:
         run: |
           git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-integration-api-gateway-and-eks.git -b main
 
+      - name: Cloning terraform module RDS
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-rds.git -b main
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
