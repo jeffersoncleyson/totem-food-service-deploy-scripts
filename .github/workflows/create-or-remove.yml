@@ -91,6 +91,11 @@ jobs:
         run: |
           git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-rds.git -b main
 
+      - name: Cloning terraform module SNS and SQS
+        continue-on-error: false
+        run: |
+          git clone https://github.com/jeffersoncleyson/totem-food-service-tf-module-sns-and-sqs.git -b main
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
